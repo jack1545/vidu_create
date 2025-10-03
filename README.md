@@ -7,7 +7,18 @@
 
 ## 项目文件夹说明
 1. 项目文件夹应该包含：分镜图、prompt.txt
+
+![项目目录内容](/guide/1.png)
+
 2. prompt.txt 的提示词一行一条，也可以后面添加
+
+![prompt内容](/guide/2.png)
+
+3. 插件工作界面
+
+批量提交默认是将所有分镜一次性按顺序提交（可能存在bug）
+
+![插件界面](/guide/3.png)
 
 ## 豆包视频批量提交插件未完成：😂 Creative Workbench → Doubao Video (Chrome Extension MVP)
 
