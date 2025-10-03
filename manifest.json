@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Vidu 批量提交助手",
+  "version": "0.3.0",
+  "description": "读取本地项目文件夹的分镜图片与提示词，批量协助在 vidu.cn 提交图生视频创作。",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.vidu.cn/*", "https://www.doubao.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "host_permissions": [
+    "https://www.vidu.cn/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "permissions": [
+    "scripting",
+    "downloads",
+    "storage",
+    "tabs"
+  ]
+}
