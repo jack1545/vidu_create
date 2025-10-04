@@ -9,11 +9,19 @@
   const batchDelayEl = document.getElementById('batchDelay')
   const ratio916Btn = document.getElementById('ratio916')
   const ratio169Btn = document.getElementById('ratio169')
+  const promptInput = document.getElementById('promptInput')
+  const createProjectFromPromptsBtn = document.getElementById('createProjectFromPrompts')
+  const imagePoolEl = document.getElementById('imagePool')
+  const imagePoolPicker = document.getElementById('imagePoolPicker')
+  const imagePoolList = document.getElementById('imagePoolList')
 
   let projects = [] // [{ name, shots: [{index, imageFile, prompt}] }]
   let isRunning = false
   let objectUrls = []
   let previewRatio = localStorage.getItem('viduPreviewRatio') || '9:16'
+  let imagePool = [] // [{ file, url, name }]
+  let poolUrls = []
+  const hasChromeStorage = typeof chrome !== 'undefined' && chrome?.storage?.local
 
   function applyPreviewRatio() {
     const cssRatio = previewRatio === '16:9' ? '16 / 9' : '9 / 16'
@@ -57,6 +65,28 @@
     return { shots, prompts }
   }
 
+  function renderImagePool() {
+    imagePoolList.innerHTML = ''
+    poolUrls.forEach(u => URL.revokeObjectURL(u))
+    poolUrls = []
+    imagePool.forEach((it, idx) => {
+      const item = document.createElement('div')
+      item.className = 'shot'
+      item.setAttribute('draggable', 'true')
+      const url = it.url || (it.file ? URL.createObjectURL(it.file) : '')
+      if (url) poolUrls.push(url)
+      item.innerHTML = `
+        <div class="row" style="justify-content:space-between"><div>${it.name || it.file?.name || '未命名'}</div><button class="remove-pool-item" data-idx="${idx}">删除</button></div>
+        <div class="preview">${url ? `<img src="${url}" alt="${it.name || ''}" />` : `<div class="muted">无图片可预览</div>`}</div>
+      `
+      // 拖拽从池到分镜
+      item.addEventListener('dragstart', (e) => {
+        e.dataTransfer?.setData('text/pool-index', String(idx))
+      })
+      imagePoolList.appendChild(item)
+    })
+  }
+
   function renderProjects() {
     projectList.innerHTML = ''
     // 清理旧的 ObjectURL 防止内存泄漏
@@ -65,12 +95,15 @@
     projects.forEach((p, i) => {
       const div = document.createElement('div')
       div.className = 'project'
-      div.innerHTML = `<div class="row"><strong>${p.name}</strong><span class="badge">${p.shots.length} shots</span><button class="remove-project" data-pi="${i}">移除项目</button></div>`
+      div.innerHTML = `<div class="row"><strong>${p.name}</strong><span class="badge">${p.shots.length} shots</span><button class="add-shot" data-pi="${i}">新增分镜</button><button class="fill-project" data-pi="${i}">快速填充</button><button class="remove-project" data-pi="${i}">移除项目</button></div>`
       const shots = document.createElement('div')
       shots.className = 'shots'
       p.shots.forEach((s, j) => {
         const item = document.createElement('div')
         item.className = 'shot'
+        item.setAttribute('data-pi', String(i))
+        item.setAttribute('data-si', String(j))
+        item.setAttribute('draggable', 'true')
         const safeName = s.imageFile?.name || '未命名'
         const url = s.imageFile ? URL.createObjectURL(s.imageFile) : ''
         if (url) objectUrls.push(url)
@@ -126,6 +159,43 @@
         projects.splice(pi, 1)
         renderProjects()
       }
+    } else if (btn.classList.contains('add-shot')) {
+      const pi = Number(btn.getAttribute('data-pi'))
+      if (!Number.isFinite(pi)) return
+      const p = projects[pi]
+      if (!p) return
+      const indices = (p.shots || []).map(s => s.index).filter(n => Number.isFinite(n))
+      const nextIndex = indices.length ? Math.max(...indices) + 1 : 1
+      const newShot = { index: nextIndex, imageFile: null, prompt: '' }
+      p.shots = Array.isArray(p.shots) ? p.shots.concat(newShot) : [newShot]
+      renderProjects()
+    } else if (btn.classList.contains('fill-project')) {
+      const pi = Number(btn.getAttribute('data-pi'))
+      if (!Number.isFinite(pi)) return
+      const p = projects[pi]
+      if (!p) return
+      // 若没有分镜，按图片池创建分镜；否则填充未设置图片的分镜
+      function inferIndexFromName(name) {
+        const m = name?.match(/(?:shot[_\-\s]?)(\d+)|(\b\d+\b)/i)
+        return m ? Number(m[1] || m[2]) : null
+      }
+      if (!Array.isArray(p.shots) || p.shots.length === 0) {
+        p.shots = imagePool.map((it, idx) => {
+          const inferred = inferIndexFromName(it.file?.name || it.name || '')
+          const index = inferred ?? (idx + 1)
+          return { index, imageFile: it.file, prompt: '' }
+        })
+      } else {
+        for (let si = 0, pi2 = 0; si < p.shots.length && pi2 < imagePool.length; si++) {
+          if (!p.shots[si].imageFile) {
+            p.shots[si].imageFile = imagePool[pi2].file
+            pi2++
+          }
+        }
+      }
+      // 根据 index 排序
+      p.shots.sort((a,b) => (a.index||99999) - (b.index||99999))
+      renderProjects()
     } else if (btn.classList.contains('remove-shot')) {
       const pi = Number(btn.getAttribute('data-pi'))
       const si = Number(btn.getAttribute('data-si'))
@@ -139,6 +209,61 @@
     }
   })
 
+  // 分镜区域拖拽：接收图片池项或桌面文件，并支持分镜排序
+  projectList.addEventListener('dragover', (e) => {
+    const shotEl = e.target.closest('.shot')
+    if (shotEl) e.preventDefault()
+  })
+  projectList.addEventListener('drop', (e) => {
+    const shotEl = e.target.closest('.shot')
+    if (!shotEl) return
+    e.preventDefault()
+    const pi = Number(shotEl.getAttribute('data-pi'))
+    const si = Number(shotEl.getAttribute('data-si'))
+    const p = projects[pi]
+    if (!p || !Number.isFinite(si)) return
+    // 1) 从图片池拖拽
+    const poolIdxStr = e.dataTransfer?.getData('text/pool-index')
+    if (poolIdxStr !== undefined && poolIdxStr !== '') {
+      const poolIdx = Number(poolIdxStr)
+      if (Number.isFinite(poolIdx) && imagePool[poolIdx]?.file) {
+        p.shots[si].imageFile = imagePool[poolIdx].file
+        renderProjects()
+        return
+      }
+    }
+    // 2) 桌面文件直接拖入
+    const files = Array.from(e.dataTransfer?.files || [])
+    const img = files.find(f => /\.(png|jpg|jpeg|webp)$/i.test(f.name))
+    if (img) {
+      p.shots[si].imageFile = img
+      renderProjects()
+      return
+    }
+    // 3) 分镜排序：从另一个分镜拖拽到此
+    const shotSrc = e.dataTransfer?.getData('text/shot-source')
+    if (shotSrc) {
+      const [spiStr, ssiStr] = shotSrc.split(':')
+      const spi = Number(spiStr), ssi = Number(ssiStr)
+      if (Number.isFinite(spi) && Number.isFinite(ssi) && spi === pi) {
+        const arr = p.shots
+        const [moved] = arr.splice(ssi, 1)
+        arr.splice(si, 0, moved)
+        renderProjects()
+      }
+    }
+  })
+  // 设置分镜的 dragstart 委托（写入来源索引）
+  projectList.addEventListener('dragstart', (e) => {
+    const shotEl = e.target.closest('.shot')
+    if (!shotEl) return
+    const pi = shotEl.getAttribute('data-pi')
+    const si = shotEl.getAttribute('data-si')
+    if (pi != null && si != null) {
+      e.dataTransfer?.setData('text/shot-source', `${pi}:${si}`)
+    }
+  })
+
   clearBtn.addEventListener('click', () => {
     projects = []
     renderProjects()
@@ -146,11 +271,16 @@
   })
 
   saveBtn.addEventListener('click', async () => {
-    await chrome.storage.local.set({ viduProjects: projects })
-    alert('已保存项目到本地')
+    if (hasChromeStorage) {
+      await chrome.storage.local.set({ viduProjects: projects })
+      alert('已保存项目到本地')
+    } else {
+      alert('当前预览环境不支持存储（需在插件选项页中运行）')
+    }
   })
 
   async function loadSaved() {
+    if (!hasChromeStorage) return
     const { viduProjects } = await chrome.storage.local.get('viduProjects')
     if (Array.isArray(viduProjects)) {
       projects = viduProjects
@@ -158,6 +288,56 @@
     }
   }
   loadSaved()
+
+  // 新建项目：按行提示词生成分镜
+  createProjectFromPromptsBtn?.addEventListener('click', () => {
+    const raw = (promptInput?.value || '')
+    const prompts = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+    if (!prompts.length) {
+      alert('请输入至少一条提示词（每行一条）')
+      return
+    }
+    const shots = prompts.map((p, i) => ({ index: i + 1, imageFile: null, prompt: p }))
+    const id = `project-${Date.now()}`
+    const name = `新建项目 ${projects.length + 1}`
+    projects.push({ id, name, shots })
+    renderProjects()
+    promptInput.value = ''
+  })
+
+  // 图片池：批量选择
+  imagePoolPicker?.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || [])
+    const imgs = files.filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f.name))
+    imagePool.push(...imgs.map(f => ({ file: f, name: f.name })))
+    renderImagePool()
+    imagePoolPicker.value = ''
+  })
+  // 图片池：拖拽添加
+  imagePoolEl?.addEventListener('dragover', (e) => {
+    e.preventDefault()
+  })
+  imagePoolEl?.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const files = Array.from(e.dataTransfer?.files || [])
+    const imgs = files.filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f.name))
+    if (imgs.length) {
+      imagePool.push(...imgs.map(f => ({ file: f, name: f.name })))
+      renderImagePool()
+    }
+  })
+  // 图片池：删除项
+  imagePoolEl?.addEventListener('click', (e) => {
+    const btn = e.target.closest('button.remove-pool-item')
+    if (!btn) return
+    const idx = Number(btn.getAttribute('data-idx'))
+    if (Number.isFinite(idx)) {
+      const it = imagePool[idx]
+      if (it?.url) URL.revokeObjectURL(it.url)
+      imagePool.splice(idx, 1)
+      renderImagePool()
+    }
+  })
 
   ratio916Btn?.addEventListener('click', () => {
     previewRatio = '9:16'

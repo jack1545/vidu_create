@@ -10,7 +10,10 @@
       .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       .projects { margin-top: 12px; display: grid; grid-template-columns: 1fr; gap: 8px; }
       .project { border: 1px solid #ddd; border-radius: 8px; padding: 8px; }
-      .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+      .shots { display: grid; gap: 8px; grid-template-columns: 1fr; }
+      @media (min-width: 480px) { .shots { grid-template-columns: repeat(2, 1fr); } }
+      @media (min-width: 720px) { .shots { grid-template-columns: repeat(3, 1fr); } }
+      @media (min-width: 960px) { .shots { grid-template-columns: repeat(4, 1fr); } }
       .shot { border: 1px dashed #ccc; border-radius: 6px; padding: 6px; font-size: 12px; }
       textarea { width: 100%; min-height: 90px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
       .muted { color: #666; font-size: 12px; }
@@ -21,6 +24,9 @@
       /* 预览容器，支持 9:16 与 16:9 比例 */
       .preview { width: 100%; aspect-ratio: var(--preview-ratio); border: 1px solid #eee; border-radius: 6px; background: #f7f7f9; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 6px 0; }
       .preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+      .image-pool { position: sticky; top: 16px; }
+      .narrow { max-width: 640px; }
+      .pool-hint { margin-top: 6px; }
     </style>
   </head>
   <body>
@@ -31,6 +37,14 @@
       <input id="folderPicker" type="file" webkitdirectory multiple />
       <button id="clearBtn">清空已选择</button>
       <button id="saveBtn" class="primary">保存项目到本地</button>
+    </div>
+
+    <!-- 新建项目：分镜提示词（每行一条） -->
+    <div class="narrow" style="margin-top:8px">
+      <textarea id="promptInput" placeholder="每行一条提示词，对应一个分镜，例如：\n镜头1的提示词\n镜头2的提示词" style="width:100%; min-height:96px"></textarea>
+      <div class="row" style="margin-top:6px">
+        <button id="createProjectFromPrompts" class="primary">新建项目</button>
+      </div>
     </div>
 
     <div class="row" style="margin-top:8px">
@@ -46,6 +60,15 @@
         <div id="projectList" class="projects"></div>
       </div>
       <div>
+        <h3>分镜图片池</h3>
+        <div id="imagePool" class="image-pool">
+          <div class="row">
+            <input id="imagePoolPicker" type="file" multiple accept="image/*" />
+          </div>
+          <div id="imagePoolList" class="shots" style="margin-top:8px"></div>
+          <div class="pool-hint"><strong>可拖拽图片到此区域或到具体分镜</strong></div>
+        </div>
+
         <h3>批量提交</h3>
         <div class="row">
           <label>并发：
