@@ -95,7 +95,7 @@
     projects.forEach((p, i) => {
       const div = document.createElement('div')
       div.className = 'project'
-      div.innerHTML = `<div class="row"><strong>${p.name}</strong><span class="badge">${p.shots.length} shots</span><button class="add-shot" data-pi="${i}">新增分镜</button><button class="fill-project" data-pi="${i}">快速填充</button><button class="remove-project" data-pi="${i}">移除项目</button></div>`
+      div.innerHTML = `<div class="row"><strong>${p.name}</strong><span class="badge">${p.shots.length} shots</span><button class="add-shot" data-pi="${i}">新增分镜</button><button class="compress-project" data-pi="${i}">压缩图片</button><span class="muted"><strong>压缩图片可以避免提交失败</strong></span><button class="fill-project" data-pi="${i}">快速填充</button><button class="remove-project" data-pi="${i}">移除项目</button></div>`
       const shots = document.createElement('div')
       shots.className = 'shots'
       p.shots.forEach((s, j) => {
@@ -169,6 +169,20 @@
       const newShot = { index: nextIndex, imageFile: null, prompt: '' }
       p.shots = Array.isArray(p.shots) ? p.shots.concat(newShot) : [newShot]
       renderProjects()
+    } else if (btn.classList.contains('compress-project')) {
+      const pi = Number(btn.getAttribute('data-pi'))
+      if (!Number.isFinite(pi)) return
+      const p = projects[pi]
+      if (!p) return
+      btn.disabled = true
+      compressProjectImages(p).then((count) => {
+        renderProjects()
+        alert(`已压缩 ${count} 张分镜图片为 WebP（保持原分辨率与清晰度）`)
+      }).catch(() => {
+        alert('压缩过程中发生错误，请重试')
+      }).finally(() => {
+        btn.disabled = false
+      })
     } else if (btn.classList.contains('fill-project')) {
       const pi = Number(btn.getAttribute('data-pi'))
       if (!Number.isFinite(pi)) return
@@ -208,6 +222,65 @@
       }
     }
   })
+
+  async function compressProjectImages(project) {
+    let count = 0
+    if (!project || !Array.isArray(project.shots)) return count
+    for (const s of project.shots) {
+      const f = s.imageFile
+      if (!f || !(f instanceof File)) continue
+      const compressed = await compressImageFileToWebp(f).catch(() => null)
+      if (compressed) {
+        s.imageFile = compressed
+        count++
+      }
+    }
+    return count
+  }
+
+  function fileNameToWebp(name) {
+    const dot = name.lastIndexOf('.')
+    const base = dot > 0 ? name.slice(0, dot) : name
+    return `${base}.webp`
+  }
+
+  async function compressImageFileToWebp(file) {
+    // 使用 createImageBitmap 处理 EXIF 方向；保持原始分辨率
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const width = bmp.width
+    const height = bmp.height
+    let canvas
+    let ctx
+    if (typeof OffscreenCanvas !== 'undefined') {
+      canvas = new OffscreenCanvas(width, height)
+      ctx = canvas.getContext('2d')
+    } else {
+      const cvs = document.createElement('canvas')
+      cvs.width = width
+      cvs.height = height
+      canvas = cvs
+      ctx = cvs.getContext('2d')
+    }
+    if (!ctx) throw new Error('Canvas 2D context not available')
+    ctx.drawImage(bmp, 0, 0, width, height)
+    // 高质量 WebP，尽量保真；不改变分辨率
+    const blob = await new Promise((resolve, reject) => {
+      try {
+        const done = (b) => b ? resolve(b) : reject(new Error('toBlob returned null'))
+        if (canvas instanceof OffscreenCanvas) {
+          canvas.convertToBlob({ type: 'image/webp', quality: 0.95 }).then(resolve).catch(reject)
+        } else {
+          canvas.toBlob(done, 'image/webp', 0.95)
+        }
+      } catch (e) {
+        reject(e)
+      }
+    })
+    const newName = fileNameToWebp(file.name)
+    const compressedFile = new File([blob], newName, { type: 'image/webp', lastModified: Date.now() })
+    bmp.close?.()
+    return compressedFile
+  }
 
   // 分镜区域拖拽：接收图片池项或桌面文件，并支持分镜排序
   projectList.addEventListener('dragover', (e) => {
