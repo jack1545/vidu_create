@@ -386,16 +386,38 @@
       optionsBtn.textContent = '设置（选项）'
       optionsBtn.style.cssText = 'padding:4px 8px; border:1px solid #4c9fff; border-radius:8px; background:#1a6fff; color:#fff; cursor:pointer'
 
-      const pickerBtn = document.createElement('button')
-      pickerBtn.textContent = '首帧选择器'
-      pickerBtn.style.cssText = 'padding:4px 8px; border:1px solid #4c9fff; border-radius:8px; background:#1a6fff; color:#fff; cursor:pointer'
+      // 设置按钮区域容器（新增：在其下方添加复制链接提示）
+      const optionsContainer = document.createElement('div')
+      optionsContainer.style.cssText = 'display:flex; flex-direction:column; gap:4px'
+
+      const urlRow = document.createElement('div')
+      urlRow.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:12px; color:#cbd5e1;'
+      const urlStr = 'chrome-extension://hlfeapciangbfkmpgieklefdbijpfkic/options.html'
+      const urlHint = document.createElement('span')
+      urlHint.textContent = `可以复制 ${urlStr} 在浏览器打开`
+      const copyBtn = document.createElement('button')
+      copyBtn.textContent = '复制'
+      copyBtn.style.cssText = 'padding:2px 8px; border:1px solid #4c9fff; border-radius:6px; background:#1a6fff; color:#fff; cursor:pointer'
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(urlStr)
+          copyBtn.textContent = '已复制'
+          setTimeout(() => { copyBtn.textContent = '复制' }, 1500)
+        } catch (e) {
+          copyBtn.textContent = '复制失败'
+          setTimeout(() => { copyBtn.textContent = '复制' }, 1500)
+        }
+      })
+      urlRow.appendChild(urlHint)
+      urlRow.appendChild(copyBtn)
+      optionsContainer.appendChild(urlRow)
 
       const state = localStorage.getItem('viduFloatingMenuCollapsed') === '1'
       const content = document.createElement('div')
       content.style.cssText = 'display:flex; align-items:center; gap:10px'
       content.appendChild(title)
-      content.appendChild(pickerBtn)
-      content.appendChild(optionsBtn)
+      // 移除“首帧选择器”按钮
+      content.appendChild(optionsContainer)
 
       const taskInfo = document.createElement('span')
       taskInfo.id = 'vidu-floating-task'
@@ -430,12 +452,11 @@
         }
       })
 
-      // 在用户手势内打开系统文件选择器
-      pickerBtn.addEventListener('click', () => {
-        try { openFirstFramePicker() } catch {}
-      })
+      // 已移除“首帧选择器”按钮，因此不再绑定其点击事件
 
       bar.appendChild(collapseBtn)
+      // 将“设置（选项）”按钮与“折叠”按钮并排放置
+      bar.appendChild(optionsBtn)
       bar.appendChild(content)
       document.body.appendChild(bar)
     } catch (e) {

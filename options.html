@@ -19,6 +19,8 @@
       .muted { color: #666; font-size: 12px; }
       button { padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
       button.primary { background: #1677ff; color: white; border-color: #1677ff; }
+      /* 伪按钮样式（用于 label 点击触发文件选择） */
+      .button-like { padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
       .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       .badge { display: inline-block; padding: 2px 6px; border-radius: 999px; border: 1px solid #ddd; font-size: 12px; }
       /* 预览容器，支持 9:16 与 16:9 比例 */
@@ -31,10 +33,15 @@
   </head>
   <body>
     <h1>Vidu 批量提交助手</h1>
-    <p class="muted">选择本地项目文件夹（支持多选），每个文件夹代表一个“视频项目”。插件会读取分镜图片和提示词，批量协助在 <code>vidu.cn</code> 提交。</p>
+    <p class="muted">创建方式1：选择本地项目文件夹（支持多选），每个文件夹代表一个“视频项目”。插件会读取分镜图片（1、2、3..这样命名）和提示词prompt.txt</p>
+    <p class="muted">创建方式2：在输入框输入分镜提示词 > 新建项目 > 把本地图片拖入对应分镜</p>
 
     <div class="row">
-      <input id="folderPicker" type="file" webkitdirectory multiple />
+      <label for="folderPicker" class="button-like">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M3 7h5l2 2h11v10H3z"/></svg>
+        选择文件
+      </label>
+      <input id="folderPicker" type="file" webkitdirectory multiple style="display:none" />
       <button id="clearBtn">清空已选择</button>
       <button id="saveBtn" class="primary">保存项目到本地</button>
     </div>
@@ -66,7 +73,7 @@
             <input id="imagePoolPicker" type="file" multiple accept="image/*" />
           </div>
           <div id="imagePoolList" class="shots" style="margin-top:8px"></div>
-          <div class="pool-hint"><strong>可拖拽图片到此区域或到具体分镜</strong></div>
+          <div class="pool-hint"><strong>可拖拽或在此处 Ctrl+V 粘贴图片</strong></div>
         </div>
 
         <h3>批量提交</h3>

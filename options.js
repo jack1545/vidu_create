@@ -95,7 +95,7 @@
     projects.forEach((p, i) => {
       const div = document.createElement('div')
       div.className = 'project'
-      div.innerHTML = `<div class="row"><strong>${p.name}</strong><span class="badge">${p.shots.length} shots</span><button class="add-shot" data-pi="${i}">新增分镜</button><button class="compress-project" data-pi="${i}">压缩图片</button><span class="muted"><strong>压缩图片可以避免提交失败</strong></span><button class="fill-project" data-pi="${i}">快速填充</button><button class="remove-project" data-pi="${i}">移除项目</button></div>`
+      div.innerHTML = `<div class="row"><strong>${p.name}</strong><span class="badge">${p.shots.length} shots</span><button class="add-shot" data-pi="${i}">新增分镜</button><button class="compress-project" data-pi="${i}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px"><path d="M20 6L9 17l-5-5"/></svg>压缩图片</button><span class="muted"><strong style="color:green">压缩图片可以避免提交失败</strong></span><button class="remove-project" data-pi="${i}">移除项目</button></div>`
       const shots = document.createElement('div')
       shots.className = 'shots'
       p.shots.forEach((s, j) => {
@@ -183,33 +183,6 @@
       }).finally(() => {
         btn.disabled = false
       })
-    } else if (btn.classList.contains('fill-project')) {
-      const pi = Number(btn.getAttribute('data-pi'))
-      if (!Number.isFinite(pi)) return
-      const p = projects[pi]
-      if (!p) return
-      // 若没有分镜，按图片池创建分镜；否则填充未设置图片的分镜
-      function inferIndexFromName(name) {
-        const m = name?.match(/(?:shot[_\-\s]?)(\d+)|(\b\d+\b)/i)
-        return m ? Number(m[1] || m[2]) : null
-      }
-      if (!Array.isArray(p.shots) || p.shots.length === 0) {
-        p.shots = imagePool.map((it, idx) => {
-          const inferred = inferIndexFromName(it.file?.name || it.name || '')
-          const index = inferred ?? (idx + 1)
-          return { index, imageFile: it.file, prompt: '' }
-        })
-      } else {
-        for (let si = 0, pi2 = 0; si < p.shots.length && pi2 < imagePool.length; si++) {
-          if (!p.shots[si].imageFile) {
-            p.shots[si].imageFile = imagePool[pi2].file
-            pi2++
-          }
-        }
-      }
-      // 根据 index 排序
-      p.shots.sort((a,b) => (a.index||99999) - (b.index||99999))
-      renderProjects()
     } else if (btn.classList.contains('remove-shot')) {
       const pi = Number(btn.getAttribute('data-pi'))
       const si = Number(btn.getAttribute('data-si'))
@@ -396,6 +369,45 @@
     const imgs = files.filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f.name))
     if (imgs.length) {
       imagePool.push(...imgs.map(f => ({ file: f, name: f.name })))
+      renderImagePool()
+    }
+  })
+  // 图片池：剪贴板粘贴（支持直接粘贴截图或 dataURL）
+  imagePoolEl?.addEventListener('paste', (e) => {
+    const items = Array.from(e.clipboardData?.items || [])
+    let added = 0
+    // 优先处理剪贴板中的图片文件
+    for (const it of items) {
+      if (it.type && it.type.startsWith('image/')) {
+        const file = it.getAsFile()
+        if (file) {
+          const ext = (file.type.split('/')[1] || 'png')
+          const name = file.name || `pasted.${ext}`
+          imagePool.push({ file, name })
+          added++
+        }
+      }
+    }
+    // 若未捕获到图片文件，尝试处理文本中的 dataURL
+    if (!added) {
+      const textItem = items.find(it => it.type === 'text/plain')
+      if (textItem) {
+        textItem.getAsString(async (str) => {
+          if (/^data:image\//.test(str)) {
+            try {
+              const blob = await (await fetch(str)).blob()
+              const ext = (blob.type.split('/')[1] || 'png')
+              const file = new File([blob], `pasted.${ext}`, { type: blob.type })
+              imagePool.push({ file, name: file.name })
+              renderImagePool()
+            } catch (err) {
+              console.error('粘贴 dataURL 解析失败', err)
+            }
+          }
+        })
+      }
+    }
+    if (added) {
       renderImagePool()
     }
   })
