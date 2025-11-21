@@ -317,7 +317,7 @@
           return { ok: false, error: 'no_image_selected' }
         }
       }
-      await sleep(300)
+      await sleep(3000)
       const clicked = await clickCreateButton()
       if (!clicked) {
         log('未找到或未能点击“创作”按钮')

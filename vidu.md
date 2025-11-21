@@ -107,6 +107,7 @@ chrome.storage.local.set({
 ```html
 <button class="inline-flex items-center justify-center whitespace-nowrap ring-offset-white transition-colors bg-ShengshuButton hover:bg-ShengshuButtonHover text-black font-semibold h-12 rounded-12 px-8 relative w-full overflow-hidden text-lg disabled:cursor-not-allowed"><div class="flex items-center justify-center"><span>创作</span><svg width="1em" height="1em" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="mr-1 ml-2 shrink-0 text-base"><path d="M12 24C18.6274 24 24 18.6274 24 12C24 5.37258 18.6274 0 12 0C5.37258 0 0 5.37258 0 12C0 18.6274 5.37258 24 12 24ZM14.8571 9.14286C12.8929 7.17857 12 3.42857 12 3.42857C12 3.42857 11.1071 7.17857 9.14286 9.14286C7.17857 11.1071 3.42857 12 3.42857 12C3.42857 12 7.29018 13.0045 9.14286 14.8571C10.9955 16.7098 12 20.5714 12 20.5714C12 20.5714 12.7366 16.9777 14.8571 14.8571C16.9777 12.7366 20.5714 12 20.5714 12C20.5714 12 16.8214 11.1071 14.8571 9.14286Z" fill="currentColor" fill-rule="evenodd"></path></svg><span class="mr-1" style="color: inherit;">10</span></div></button>
 ```
+   - 现在在每个分镜提交前将强制等待 5 秒再点击“创作”。
 
 ## 批量提交功能
 ### 提交多个视频项目
